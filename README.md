@@ -13,3 +13,4 @@ The project intends to use a point cloud camera to differentiate between the siz
 The actual physical UR10 robot is a great choice for simulating an automation process for grocery stores. This is due to it's great reach and a reasonable payload capacity. 
 
 # Code Repository
+https://github.com/lulu110997/LabAssignment2LouisJas/blob/master/README.md
