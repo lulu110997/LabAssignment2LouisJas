@@ -23,7 +23,7 @@ function varargout = LabAssignment2_Louis_Jas(varargin)
 % 6.283185307180
 % Edit the above text to modify the response to help LabAssignment2_Louis_Jas
 
-% Last Modified by GUIDE v2.5 27-Sep-2020 20:53:57
+% Last Modified by GUIDE v2.5 01-Oct-2020 02:04:35
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -52,10 +52,10 @@ function LabAssignment2_Louis_Jas_OpeningFcn(hObject, eventdata, handles, vararg
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 % varargin   command line arguments to LabAssignment2_Louis_Jas (see VARARGIN)
+
 handles.ur10e = createUR10eModel;
 jointState = handles.ur10e.getpos;
-Tr = handles.ur10e.fkine(jointState);
-% Change texts that displays the joint angles and xyz location of EE
+Tr = handles.ur10e.fkine(jointState); %Change texts that displays the joint angles and xyz location of EE
 set(handles.text8, 'String', num2str(jointState(1)));
 set(handles.text10, 'String', num2str(jointState(2)));
 set(handles.text11, 'String', num2str(jointState(3)));
@@ -65,6 +65,7 @@ set(handles.text14, 'String', num2str(jointState(6)));
 set(handles.text16, 'String', num2str(Tr(1,4)));
 set(handles.text17, 'String', num2str(Tr(2,4)));
 set(handles.text18, 'String', num2str(Tr(3,4))); 
+
 % Choose default command line output for LabAssignment2_Louis_Jas
 handles.output = hObject;
 
@@ -384,8 +385,8 @@ function slider19_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 x = get(hObject, 'Value');
-Tr = changeEndEffectorLocation(handles.ur10e, 'x', x);
-set(handles.text16, 'String', num2str(Tr(1,1)));
+xyz = changeEndEffectorLocation(handles.ur10e, 'x', x);
+set(handles.text16, 'String', num2str(xyz(1)));
 % Hints: get(hObject,'Value') returns position of slider
 %        get(hObject,'Min') and get(hObject,'Max') to determine range of slider
 
@@ -407,7 +408,9 @@ function slider20_Callback(hObject, eventdata, handles)
 % hObject    handle to slider20 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
+y = get(hObject, 'Value');
+xyz = changeEndEffectorLocation(handles.ur10e, 'y', y);
+set(handles.text17, 'String', num2str(xyz(y)));
 % Hints: get(hObject,'Value') returns position of slider
 %        get(hObject,'Min') and get(hObject,'Max') to determine range of slider
 
@@ -429,7 +432,9 @@ function slider21_Callback(hObject, eventdata, handles)
 % hObject    handle to slider21 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
+z = get(hObject, 'Value');
+xyz = changeEndEffectorLocation(handles.ur10e, 'z', z);
+set(handles.text18, 'String', num2str(xyz(3)));
 % Hints: get(hObject,'Value') returns position of slider
 %        get(hObject,'Min') and get(hObject,'Max') to determine range of slider
 
@@ -444,3 +449,46 @@ function slider21_CreateFcn(hObject, eventdata, handles)
 if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor',[.9 .9 .9]);
 end
+
+
+% --- Executes on slider movement.
+function slider22_Callback(hObject, eventdata, handles)
+% hObject    handle to slider22 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'Value') returns position of slider
+%        get(hObject,'Min') and get(hObject,'Max') to determine range of slider
+
+
+% --- Executes during object creation, after setting all properties.
+function slider22_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to slider22 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: slider controls usually have a light gray background.
+if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor',[.9 .9 .9]);
+end
+
+
+% --- Executes on button press in pushbutton5.
+function pushbutton5_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton5 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on button press in pushbutton6.
+function pushbutton6_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton6 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes during object creation, after setting all properties.
+function text17_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to text17 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
