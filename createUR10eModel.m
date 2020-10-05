@@ -1,10 +1,16 @@
 function ur10e = createUR10eModel(workspace, scale)
+tic
 if nargin < 2
     scale = 0.5;
 end
 if nargin < 1
-    workspace = [-3 3 -2.5 2 -0.25 2];
+    close
+    clear
+    clc
+    %     workspace = [-3 3 -2.5 2 -0.25 2.5];
+    workspace = [-1.25 1.25 -1.25 1.25 -0.25 1.25];
     scale = 0.5;
+    disp('closed, cleared, clcd')
 end
 
 % DH parameters
@@ -48,15 +54,19 @@ ur10eModel = SerialLink([L1 L2 L3 L4 L5 L6],'name','ur10e');
 %     end
 % end
 
-    ur10eModel.plotopt = {'notiles', 'nobase', 'noshadow'};
-    ur10eModel.base = ur10eModel.base*transl(0,0,0.5);
+    ur10eModel.plotopt = {'notiles', 'nobase', 'noshadow', 'noname'};
+    ur10eModel.base = ur10eModel.base*transl(0.2, 0 ,0.4);
     ur10eModel.plot([0 -pi/2 pi/2 -pi/2 -pi/2 0],'workspace',workspace, 'scale', scale);
-    
+    ur10eModel.delay = 0;
     ur10e = ur10eModel();
     hold on
     %%%%% testing %%%%%%%%%%%%%%%%%%%
-    PlaceObject('pallet.ply', [-0.6374, 0, 0]);
-    PlaceObject('safetyfence.ply', [ 0 0 -0.138]);
+    PlaceObject('pallet.ply', [-0.6374, 0, 0.06807]);
+%     PlaceObject('safetyfence.ply', [ 0 0 0]);
+    PlaceObject('table.ply', [0.75, 0.7, 0]);
+%     PlaceObject('louisBox.ply', [0.75, 0.68, 0.64]);
+%     PlaceObject('jasBox.ply', [0.75 0.68 0.59]);
+    toc
 %     ur10eModel.teach;
-%     view([0, 0])
+    view([0, 0])
 end
