@@ -23,7 +23,7 @@ function varargout = LabAssignment2_Louis_Jas(varargin)
 % 6.283185307180
 % Edit the above text to modify the response to help LabAssignment2_Louis_Jas
 
-% Last Modified by GUIDE v2.5 12-Oct-2020 17:44:04
+% Last Modified by GUIDE v2.5 17-Oct-2020 02:37:51
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -52,7 +52,7 @@ function LabAssignment2_Louis_Jas_OpeningFcn(hObject, eventdata, handles, vararg
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 % varargin   command line arguments to LabAssignment2_Louis_Jas (see VARARGIN)
-handles.ur10e = createUR10eModel([-3 3 -2.5 2 -0.25 2.5] ,0.5);
+handles.ur10e = CreateUR10eModel([-3 3 -2.5 2 -0.25 2.5] ,0.5);
 jointState = handles.ur10e.getpos;
 Tr = handles.ur10e.fkine(jointState); %Change texts that displays the joint angles and xyz location of EE
 set(handles.text8, 'String', num2str(jointState(1)));
@@ -77,7 +77,9 @@ handles.estop = EmergencyStop; % Create an instance of the class for notifying w
 lh = addlistener(handles.estop,'eStopActive',@HandleEmergencyStopState); % Add a listener
 
 handles.dlt = 0; % For deleting obstacle
-
+handles.humanEntering_h = PlaceObject('bigLego.ply', [-4.5, 0, 0.03]); % For simulated asynch sensor
+handles.humanEnteringPose = transl(-3.5, 0, 0.03);
+    
 % Choose default command line output for LabAssignment2_Louis_Jas
 handles.output = hObject;
 
@@ -378,14 +380,26 @@ function pushbutton1_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 if handles.current_data == "pick and place"
-    PickAndPlace(handles.ur10e);
+    handles.boxes_h = PickAndPlace(handles.ur10e);
 elseif handles.current_data == "obstacle detection and avoidance" 
-    disp('ODAA')
+    try 
+        handles.boxesObs_h = PickAndPlaceWithCollisionDetecAndAvoid(...
+        handles.ur10e, handles.humanObstacle_h, get(handles.humanObstacle_h));
+    catch
+        mydlg = errordlg(['No obstacle in place'],'Error101')
+        waitfor(mydlg)
+    end
 elseif handles.current_data == "visual servoing"
-    jointForCameraPos = [-0.0002 -2.0180 1.9123 -3.0359 -1.5706 -0.0001];
-    handles.ur10e.animate(jointForCameraPos);
+    jointForCameraPos = [0 -2.1437 1.7866 -2.7846 -1.5706 0];
+    handles.ur10e.delay = 0.01;
+    handles.ur10e.animate(jtraj(handles.ur10e.getpos, jointForCameraPos,50));
     handles.stopSign_h = PlaceObject('stopSign.ply', [-1.1, -0.1741, 1.2133]);
     handles.stopSignPose = transl(-1.1, -0.1741, 1.2133);
+    handles.cam = CentralCamera('focal', 0.08, 'pixel', 10e-5, ...
+        'resolution', [1024 1024], 'centre', [512 512],'name', 'testCamera');
+    Tc0 = handles.ur10e.fkine(jointForCameraPos);
+    handles.cam.plot_camera('Tcam',Tc0, 'label','scale',0.15); % Plots camera
+
 else 
     f = errordlg('You must select an action','Error 101');
 end
@@ -424,6 +438,10 @@ switch str{val}
         set(handles.pushbutton11, 'Enable', 'on') % UP PB
         handles.current_data = 'visual servoing';
     otherwise
+        set(handles.pushbutton8, 'Enable', 'off') % DOWN PB
+        set(handles.pushbutton9, 'Enable', 'off') % LEFT PB
+        set(handles.pushbutton10, 'Enable', 'off') % RIGHT PB
+        set(handles.pushbutton11, 'Enable', 'off') % UP PB
         handles.current_data = 'Select an action';
 end
 % Save the handles structure.
@@ -446,12 +464,13 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
 end
 
 
-% --- Executes on button press in togglebutton1.
+% --- Executes on button press in togglebutton1. E-stop code goes here
 function togglebutton1_Callback(hObject, eventdata, handles)
 % hObject    handle to togglebutton1 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 if get(hObject,'Value') == 1
+    set(handles.togglebutton2, 'Value', 1); % Flag must be zero to resume operation
     % Disable all sliders
     set(handles.slider1, 'Enable', 'off')
     set(handles.slider2, 'Enable', 'off')
@@ -462,6 +481,7 @@ if get(hObject,'Value') == 1
     set(handles.slider19, 'Enable', 'off')
     set(handles.slider20, 'Enable', 'off')
     set(handles.slider21, 'Enable', 'off')
+    set(handles.slider26, 'Enable', 'off') % Slider for human entering
     % Disable all buttons except toggle button
     set(handles.pushbutton5, 'Enable', 'off')
     set(handles.pushbutton1, 'Enable', 'off')
@@ -471,8 +491,15 @@ if get(hObject,'Value') == 1
     set(handles.pushbutton10, 'Enable', 'off') % RIGHT PB
     set(handles.pushbutton11, 'Enable', 'off') % UP PB
     set(handles.pushbutton12, 'Enable', 'off') % remove obstacle PB
+    set(handles.togglebutton2, 'Enable', 'off') % Resume button 
     triggerEvent(handles.estop)
     waitfor(hObject, 'Value', 0);
+    % Enable PB
+    while(1)
+        set(handles.togglebutton2, 'Enable', 'on') % Resume button 
+        waitfor(handles.togglebutton2, 'Value', 0)
+        break
+    end
     % Enable everything
     set(handles.slider1, 'Enable', 'on')
     set(handles.slider2, 'Enable', 'on')
@@ -486,14 +513,13 @@ if get(hObject,'Value') == 1
     set(handles.pushbutton5, 'Enable', 'on')
     set(handles.pushbutton1, 'Enable', 'on')
     set(handles.pushbutton6, 'Enable', 'on')
-    set(handles.pushbutton8, 'Enable', 'on') % DOWN PB
-    set(handles.pushbutton9, 'Enable', 'on') % LEFT PB
-    set(handles.pushbutton10, 'Enable', 'on') % RIGHT PB
-    set(handles.pushbutton11, 'Enable', 'on') % UP PB
-    set(handles.pushbutton12, 'Enable', 'off') % remove obstacle PB
+    set(handles.pushbutton12, 'Enable', 'on') % Obstacle PB
+    set(handles.slider26, 'Enable', 'on') % Slider for human entering
     
     
 end
+% Save the handles structure.
+guidata(hObject,handles)
 % Hint: get(hObject,'Value') returns toggle state of togglebutton1
 
 
@@ -534,7 +560,7 @@ function slider19_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 x = get(hObject, 'Value');
-xyz = changeEndEffectorLocation(handles.ur10e, 'x', x);
+xyz = ChangeEndEffectorLocation(handles.ur10e, 'x', x);
 set(handles.text16, 'String', num2str(xyz(1)));
 % Hints: get(hObject,'Value') returns position of slider
 %        get(hObject,'Min') and get(hObject,'Max') to determine range of slider
@@ -558,7 +584,7 @@ function slider20_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 y = get(hObject, 'Value');
-xyz = changeEndEffectorLocation(handles.ur10e, 'y', y);
+xyz = ChangeEndEffectorLocation(handles.ur10e, 'y', y);
 set(handles.text17, 'String', num2str(xyz(2)));
 % Hints: get(hObject,'Value') returns position of slider
 %        get(hObject,'Min') and get(hObject,'Max') to determine range of slider
@@ -582,7 +608,7 @@ function slider21_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 z = get(hObject, 'Value');
-xyz = changeEndEffectorLocation(handles.ur10e, 'z', z);
+xyz = ChangeEndEffectorLocation(handles.ur10e, 'z', z);
 set(handles.text18, 'String', num2str(xyz(3)));
 % Hints: get(hObject,'Value') returns position of slider
 %        get(hObject,'Min') and get(hObject,'Max') to determine range of slider
@@ -753,7 +779,27 @@ function pushbutton8_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton8 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+stopSignVertexCount = size(get(handles.stopSign_h,'Vertices'),1);
 
+midPoint = (sum(get(handles.stopSign_h,'Vertices'))/stopSignVertexCount);
+boxVerts = (get(handles.stopSign_h,'Vertices') - repmat(midPoint,stopSignVertexCount,1));
+
+% Move the stop sign back (-z)
+downwardsTR = makehgtform('translate',[0, 0, -0.2]);
+handles.stopSignPose = handles.stopSignPose * downwardsTR;
+updatedPoints = [handles.stopSignPose * [boxVerts,ones(stopSignVertexCount,1)]']';
+set(handles.stopSign_h,'Vertices', updatedPoints(:,1:3)); 
+drawnow;
+set(handles.pushbutton8, 'Enable', 'off') % DOWN PB
+set(handles.pushbutton9, 'Enable', 'off') % LEFT PB
+set(handles.pushbutton10, 'Enable', 'off') % RIGHT PB
+set(handles.pushbutton11, 'Enable', 'off') % UP PB
+RetreatFromSafetySymbol(handles.ur10e, handles.cam, handles.stopSign_h);
+set(handles.pushbutton8, 'Enable', 'on') % DOWN PB
+set(handles.pushbutton9, 'Enable', 'on') % LEFT PB
+set(handles.pushbutton10, 'Enable', 'on') % RIGHT PB
+set(handles.pushbutton11, 'Enable', 'on') % UP PB
+display('Finished moving -z')
 % Save the handles structure.
 guidata(hObject,handles)
 
@@ -763,7 +809,27 @@ function pushbutton9_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton9 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+stopSignVertexCount = size(get(handles.stopSign_h,'Vertices'),1);
 
+midPoint = (sum(get(handles.stopSign_h,'Vertices'))/stopSignVertexCount);
+boxVerts = (get(handles.stopSign_h,'Vertices') - repmat(midPoint,stopSignVertexCount,1));
+
+% Move the stop sign back (-x)
+upwardsTR = makehgtform('translate',[-0.15, 0, 0]);
+handles.stopSignPose = handles.stopSignPose * upwardsTR;
+updatedPoints = [handles.stopSignPose * [boxVerts,ones(stopSignVertexCount,1)]']';
+set(handles.stopSign_h,'Vertices', updatedPoints(:,1:3)); 
+drawnow;
+set(handles.pushbutton8, 'Enable', 'off') % DOWN PB
+set(handles.pushbutton9, 'Enable', 'off') % LEFT PB
+set(handles.pushbutton10, 'Enable', 'off') % RIGHT PB
+set(handles.pushbutton11, 'Enable', 'off') % UP PB
+RetreatFromSafetySymbol(handles.ur10e, handles.cam, handles.stopSign_h);
+set(handles.pushbutton8, 'Enable', 'on') % DOWN PB
+set(handles.pushbutton9, 'Enable', 'on') % LEFT PB
+set(handles.pushbutton10, 'Enable', 'on') % RIGHT PB
+set(handles.pushbutton11, 'Enable', 'on') % UP PB
+disp('done moving to -x')
 % Save the handles structure.
 guidata(hObject,handles)
 
@@ -773,7 +839,27 @@ function pushbutton10_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton10 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+stopSignVertexCount = size(get(handles.stopSign_h,'Vertices'),1);
 
+midPoint = (sum(get(handles.stopSign_h,'Vertices'))/stopSignVertexCount);
+boxVerts = (get(handles.stopSign_h,'Vertices') - repmat(midPoint,stopSignVertexCount,1));
+
+% Move the stop sign forward (+x)
+upwardsTR = makehgtform('translate', [0.15, 0, 0]);
+handles.stopSignPose = handles.stopSignPose * upwardsTR;
+updatedPoints = [handles.stopSignPose * [boxVerts,ones(stopSignVertexCount,1)]']';
+set(handles.stopSign_h,'Vertices', updatedPoints(:,1:3)); 
+drawnow;
+set(handles.pushbutton8, 'Enable', 'off') % DOWN PB
+set(handles.pushbutton9, 'Enable', 'off') % LEFT PB
+set(handles.pushbutton10, 'Enable', 'off') % RIGHT PB
+set(handles.pushbutton11, 'Enable', 'off') % UP PB
+RetreatFromSafetySymbol(handles.ur10e, handles.cam, handles.stopSign_h);
+set(handles.pushbutton8, 'Enable', 'on') % DOWN PB
+set(handles.pushbutton9, 'Enable', 'on') % LEFT PB
+set(handles.pushbutton10, 'Enable', 'on') % RIGHT PB
+set(handles.pushbutton11, 'Enable', 'on') % UP PB
+disp('done moving to +x')
 % Save the handles structure.
 guidata(hObject,handles)
 
@@ -783,19 +869,27 @@ function pushbutton11_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 % Get vertex count
-stopSignVertexCount = size(handles.stopSign_h.Vertices,1);
+stopSignVertexCount = size(get(handles.stopSign_h,'Vertices'),1);
 
-midPoint = (sum(handles.stopSign_h.Vertices)/stopSignVertexCount);
-boxVerts = (handles.stopSign_h.Vertices - repmat(midPoint,stopSignVertexCount,1));
+midPoint = (sum(get(handles.stopSign_h,'Vertices'))/stopSignVertexCount);
+boxVerts = (get(handles.stopSign_h,'Vertices') - repmat(midPoint,stopSignVertexCount,1));
 
-% Move the stop sign up
-upwardsTR = makehgtform('translate',[0,0,0.02]);
+% Move the stop sign up (+z)
+upwardsTR = makehgtform('translate',[0,0,0.2]);
 handles.stopSignPose = handles.stopSignPose * upwardsTR;
 updatedPoints = [handles.stopSignPose * [boxVerts,ones(stopSignVertexCount,1)]']';
-handles.stopSign_h.Vertices = updatedPoints(:,1:3);
-
-RetreatFromSafetySymbol(handles.ur10e, handles.stopSign_h);
-
+set(handles.stopSign_h,'Vertices', updatedPoints(:,1:3));
+drawnow;
+    set(handles.pushbutton8, 'Enable', 'off') % DOWN PB
+    set(handles.pushbutton9, 'Enable', 'off') % LEFT PB
+    set(handles.pushbutton10, 'Enable', 'off') % RIGHT PB
+    set(handles.pushbutton11, 'Enable', 'off') % UP PB
+RetreatFromSafetySymbol(handles.ur10e, handles.cam, handles.stopSign_h);
+    set(handles.pushbutton8, 'Enable', 'on') % DOWN PB
+    set(handles.pushbutton9, 'Enable', 'on') % LEFT PB
+    set(handles.pushbutton10, 'Enable', 'on') % RIGHT PB
+    set(handles.pushbutton11, 'Enable', 'on') % UP PB
+disp('finish moving +z')
 % Save the handles structure.
 guidata(hObject,handles)
 
@@ -805,4 +899,120 @@ function pushbutton12_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton12 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-delete(handles.humanObstacle_h)
+try
+    delete(handles.humanObstacle_h)
+catch 
+end
+try     
+    delete(handles.boxes_h{1:size(handles.boxes_h,2)})
+catch
+end
+
+% Save the handles structure.
+guidata(hObject,handles)
+
+
+
+% --- Executes on slider movement.
+function slider26_Callback(hObject, eventdata, handles)
+% hObject    handle to slider26 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+humanEnteringVertexCount = size(get(handles.humanEntering_h,'Vertices'),1);
+
+midPoint = (sum(get(handles.humanEntering_h,'Vertices')))/humanEnteringVertexCount;
+humanEnteringVerts = (get(handles.humanEntering_h,'Vertices') - repmat(midPoint,humanEnteringVertexCount,1));
+
+% Move the human in x axis direction
+x = get(hObject,'Value');
+moveInXtr = makehgtform('translate',[x, 0, 0.74]);
+% handles.humanEnteringPose = handles.humanEnteringPose*moveInXtr; disp(handles.humanEnteringPose)
+updatedPoints = [moveInXtr * [humanEnteringVerts,ones(humanEnteringVertexCount,1)]']';
+set(handles.humanEntering_h,'Vertices', updatedPoints(:,1:3)); 
+set(handles.text30, 'String', num2str(x)) 
+
+if x > -2.4
+	set(handles.slider1, 'Enable', 'off')
+    set(handles.slider2, 'Enable', 'off')
+    set(handles.slider3, 'Enable', 'off')
+    set(handles.slider4, 'Enable', 'off')
+    set(handles.slider5, 'Enable', 'off')
+    set(handles.slider6, 'Enable', 'off')
+    set(handles.slider19, 'Enable', 'off')
+    set(handles.slider20, 'Enable', 'off')
+    set(handles.slider21, 'Enable', 'off')
+    % Disable all buttons except toggle button
+    set(handles.pushbutton5, 'Enable', 'off')
+    set(handles.pushbutton1, 'Enable', 'off')
+    set(handles.pushbutton6, 'Enable', 'off')
+    set(handles.pushbutton8, 'Enable', 'off') % DOWN PB
+    set(handles.pushbutton9, 'Enable', 'off') % LEFT PB
+    set(handles.pushbutton10, 'Enable', 'off') % RIGHT PB
+    set(handles.pushbutton11, 'Enable', 'off') % UP PB
+    set(handles.pushbutton12, 'Enable', 'off') % remove obstacle PB
+    set(handles.togglebutton1, 'Enable', 'off') % TB for estop
+    mydlg = warndlg('Safety sensor has been tripped. Please remove object in the vicinity.','Warning');
+    waitfor(mydlg);
+    
+    while 1
+        if x < -2.4
+            break
+        end
+        x = get(hObject,'Value');
+        moveInXtr = makehgtform('translate',[x, 0, 0.74]);
+        % handles.humanEnteringPose = handles.humanEnteringPose*moveInXtr; disp(handles.humanEnteringPose)
+        updatedPoints = [moveInXtr * [humanEnteringVerts,ones(humanEnteringVertexCount,1)]']';
+        set(handles.humanEntering_h,'Vertices', updatedPoints(:,1:3));
+        pause(1)
+    end
+    % Enable everything
+    set(handles.slider1, 'Enable', 'on')
+    set(handles.slider2, 'Enable', 'on')
+    set(handles.slider3, 'Enable', 'on')
+    set(handles.slider4, 'Enable', 'on')
+    set(handles.slider5, 'Enable', 'on')
+    set(handles.slider6, 'Enable', 'on')
+    set(handles.slider19, 'Enable', 'on')
+    set(handles.slider20, 'Enable', 'on')
+    set(handles.slider21, 'Enable', 'on')
+    set(handles.pushbutton5, 'Enable', 'on')
+    set(handles.pushbutton1, 'Enable', 'on')
+    set(handles.pushbutton6, 'Enable', 'on')
+    set(handles.pushbutton12, 'Enable', 'on') % Obstacle PB
+    set(handles.togglebutton1, 'Enable', 'on') % TB for estop
+end
+
+guidata(hObject, handles); 
+% Hints: get(hObject,'Value') returns position of slider
+%        get(hObject,'Min') and get(hObject,'Max') to determine range of slider
+
+
+% --- Executes during object creation, after setting all properties.
+function slider26_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to slider26 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: slider controls usually have a light gray background.
+if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor',[.9 .9 .9]);
+end
+
+
+% --- Executes on button press in resume.
+function resume_Callback(hObject, eventdata, handles)
+% hObject    handle to resume (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+handles.eFlag = 0;
+% Save the handles structure.
+guidata(hObject,handles)
+
+
+% --- Executes on button press in togglebutton2.
+function togglebutton2_Callback(hObject, eventdata, handles)
+% hObject    handle to togglebutton2 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of togglebutton2
