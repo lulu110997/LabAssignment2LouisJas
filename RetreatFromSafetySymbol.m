@@ -53,14 +53,13 @@ pause(2)
 cam.hold(true);
 cam.plot(P);    % show initial view
 
-lambda = 1.3; % Gain of the controler
+lambda = 1.05; % Gain of the controler
 depth = abs(mean(P(1,:))); % Depth of the IBVS 
 
 q0 = robot.getpos';
 %% 1.4 Loop
 % loop of the visual servoing
-ksteps = 0;
-for i = 1:100
+for i = 1:125
     
     % compute the view of the camera
     uv = cam.plot(P);
@@ -101,8 +100,8 @@ for i = 1:100
     
     %compute robot's Jacobian and inverse
     J2 = robot.jacobn(q0);
-    Jinv = pinv(J2);
-%     Jinv = pinv(J2'*J2 + lambda2 *eye(6))*J2';
+%     Jinv = pinv(J2);
+    Jinv = pinv(J2'*J2 + lambda2 *eye(6))*J2';
     % get joint velocities
     qp = Jinv*v;
     

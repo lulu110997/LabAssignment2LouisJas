@@ -1,7 +1,7 @@
 function boxes_h = PickAndPlace(robot)
 
 if nargin < 1
-    robot = createUR10eModel;
+    robot = CreateUR10eModel;
 end
 
 boxes_h = cell(1,17); % Preallocate for speed
@@ -45,10 +45,10 @@ robot.animate(jtraj(robot.getpos, homeLocation, 75)) % Call the robot back to ho
 % The idea of pick/place is to go from home location --> pick up location
 % --> waypoint --> just above the of goal location --> goal location 
 % --> home location --> repeat
-count = 0; % Used to change box size
+counter = 0; % Used to change box size
 for i = 1:size(goalLocations, 1)
-    count = count + 1;
-    if count < 10
+    counter = counter + 1;
+    if counter < 10
         box = 'louisBox.ply';
     else; box = 'jasBox.ply'; 
     end
